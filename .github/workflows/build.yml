@@ -1,4 +1,4 @@
-name: Build & Deploy Proxy
+name: Build & Push to Docker Hub
 
 on:
   push:
@@ -6,44 +6,23 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_marine-service-499713-u2 }}
-  REGION: us-central1
-  SERVICE_NAME: rafael-proxy
-  VMESS_UUID: rafaeltv
-  VLESS_UUID: 15f7e8ea-7b56-45d4-93af-31f3c592fdf1
-  PASSWORD: rafaeltv
-  PORT: 8080
+  DOCKER_IMAGE: virgozki/vless:latest   # Palitan kung gusto mo ibang pangalan
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
 
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: 🔑 Authenticate with GCP
-        uses: google-github-actions/auth@v2
+      - name: 🐳 Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          credentials_json: ${{ secrets.GCP_SA_1046132445504 }}
+          username: ${{ secrets.DOCKER_virgozki }}
+          password: ${{ secrets.DOCKER_dckr_pat_bI23fAx1dX9XcJ9nOxphpl6HW_k }}
 
-      - name: ⚙️ Setup Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.PROJECT_ID }}
-
-      - name: 🚀 Enable required APIs
-        run: |
-          gcloud services enable \
-            run.googleapis.com \
-            cloudbuild.googleapis.com \
-            artifactregistry.googleapis.com \
-            --quiet
-
-      - name: 📝 Create config files
+      - name: 📝 Create all config files
         run: |
           # Xray config
           cat > config.json <<EOF
@@ -55,7 +34,7 @@ jobs:
                 "port": 10000,
                 "listen": "127.0.0.1",
                 "protocol": "vmess",
-                "settings": { "clients": [{"id":"${VMESS_UUID}","alterId":0,"security":"auto"}] },
+                "settings": { "clients": [{"id":"rafaeltv","alterId":0,"security":"auto"}] },
                 "sniffing": {"enabled":true},
                 "streamSettings": { "network": "ws", "wsSettings": { "path": "/Rafael-Tv" } }
               },
@@ -64,7 +43,7 @@ jobs:
                 "port": 10001,
                 "listen": "127.0.0.1",
                 "protocol": "vless",
-                "settings": { "clients": [{"id":"${VLESS_UUID}"}],"decryption":"none" },
+                "settings": { "clients": [{"id":"15f7e8ea-7b56-45d4-93af-31f3c592fdf1"}],"decryption":"none" },
                 "sniffing": {"enabled":true},
                 "streamSettings": { "network": "ws", "wsSettings": { "path": "/vless-rafael" } }
               },
@@ -73,7 +52,7 @@ jobs:
                 "port": 10002,
                 "listen": "127.0.0.1",
                 "protocol": "trojan",
-                "settings": { "clients": [{"password":"${PASSWORD}"}] },
+                "settings": { "clients": [{"password":"rafaeltv"}] },
                 "sniffing": {"enabled":true},
                 "streamSettings": { "network": "ws", "wsSettings": { "path": "/trojan-rafael" } }
               }
@@ -94,7 +73,7 @@ jobs:
             map \$http_upgrade \$connection_upgrade { default upgrade; '' close; }
 
             server {
-              listen ${PORT};
+              listen 8080;
               server_name _;
 
               root /usr/share/nginx/html;
@@ -197,30 +176,15 @@ jobs:
           COPY index.html /usr/share/nginx/html/index.html
           COPY entrypoint.sh /entrypoint.sh
           RUN chmod +x /usr/local/bin/xray /entrypoint.sh
-          EXPOSE ${PORT}
+          EXPOSE 8080
           ENTRYPOINT ["/entrypoint.sh"]
           EOF
 
       - name: 🏗️ Build Docker image
-        run: gcloud builds submit --tag gcr.io/${PROJECT_ID}/${SERVICE_NAME} . --quiet
+        run: docker build -t ${{ env.DOCKER_IMAGE }} .
 
-      - name: 🚀 Deploy to Cloud Run
-        run: |
-          gcloud run deploy ${SERVICE_NAME} \
-            --image gcr.io/${PROJECT_ID}/${SERVICE_NAME} \
-            --region ${REGION} \
-            --platform managed \
-            --allow-unauthenticated \
-            --port ${PORT} \
-            --memory 2Gi \
-            --cpu 1 \
-            --min-instances 0 \
-            --max-instances 1 \
-            --execution-environment gen2 \
-            --quiet
+      - name: 🚀 Push to Docker Hub
+        run: docker push ${{ env.DOCKER_IMAGE }}
 
-      - name: ✅ Result
-        run: |
-          URL=$(gcloud run services describe ${SERVICE_NAME} --region ${REGION} --format='value(status.url)')
-          echo "✅ Deployment successful!"
-          echo "🌐 Your page: $URL"
+      - name: ✅ Done
+        run: echo "✅ Matagumpay na na-push sa Docker Hub!"
