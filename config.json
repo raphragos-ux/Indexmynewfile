@@ -1,0 +1,65 @@
+{
+  "log": { "loglevel": "warning" },
+  "inbounds": [
+    {
+      "tag": "vmess-ws",
+      "port": 10000,
+      "listen": "127.0.0.1",
+      "protocol": "vmess",
+      "settings": {
+        "clients": [
+          {
+            "id": "rafaeltv",
+            "alterId": 0,
+            "security": "auto"
+          }
+        ]
+      },
+      "sniffing": { "enabled": true, "metadataOnly": false },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": { "path": "/Rafael-Tv" }
+      }
+    },
+    {
+      "tag": "trojan-ws",
+      "port": 10001,
+      "listen": "127.0.0.1",
+      "protocol": "trojan",
+      "settings": { "clients": [ { "password": "rafaeltv" } ] },
+      "sniffing": { "enabled": true, "metadataOnly": false },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": { "path": "/trojan-rafael?ed=2180" }
+      }
+    },
+    {
+      "tag": "vless-ws",
+      "port": 10002,
+      "listen": "127.0.0.1",
+      "protocol": "vless",
+      "settings": {
+        "clients": [ { "id": "15f7e8ea-7b56-45d4-93af-31f3c592fdf1", "level": 0, "email": "vless-rafael" } ],
+        "decryption": "none"
+      },
+      "sniffing": { "enabled": true, "metadataOnly": false },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": { "path": "/vless-rafael?ed=2180" }
+      }
+    },
+    {
+      "tag": "ss-httpupgrade",
+      "port": 11004,
+      "listen": "127.0.0.1",
+      "protocol": "shadowsocks",
+      "settings": { "method": "chacha20-ietf-poly1305", "password": "rafaeltv", "network": "tcp,udp" },
+      "sniffing": { "enabled": true, "metadataOnly": false },
+      "streamSettings": {
+        "network": "httpupgrade",
+        "httpupgradeSettings": { "path": "/httpupgrade-rafael?ed=2180" }
+      }
+    }
+  ],
+  "outbounds": [ { "protocol": "freedom", "tag": "direct" } ]
+}
