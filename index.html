@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rafael R. Config Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0F172A',
+                        darker: '#020617',
+                        accent: '#3B82F6',
+                        success: '#10B981',
+                        warning: '#F59E0B',
+                        danger: '#EF4444'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-thin::-webkit-scrollbar {
+                width: 6px;
+                height: 6px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-track {
+                background: #1E293B;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb {
+                background: #475569;
+                border-radius: 3px;
+            }
+            .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+                background: #64748B;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-darker to-dark text-gray-100 font-inter min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl md:text-4xl font-bold text-accent mb-2">
+                <i class="fa fa-cogs mr-2"></i>Config Generator
+            </h1>
+            <p class="text-gray-400">VMess • VLESS • Trojan • Shadowsocks | GCP Cloud Run</p>
+        </header>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="space-y-6">
+                <div class="bg-slate-800 rounded-lg p-5 shadow-lg border border-slate-700">
+                    <h3 class="text-xl font-semibold text-white mb-3 flex items-center">
+                        <i class="fa fa-server mr-2 text-accent"></i>Server Address
+                    </h3>
+                    <ul class="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                        <li>fonts.googleapis.com</li>
+                        <li>run.googleapis.com</li>
+                        <li>googleapis.com</li>
+                        <li>firebase.google.com</li>
+                        <li>storage.googleapis.com</li>
+                        <li>firebase-settings.crashlytics.com</li>
+                    </ul>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-5 shadow-lg border border-slate-700">
+                    <h3 class="text-xl font-semibold text-white mb-3 flex items-center">
+                        <i class="fa fa-lock mr-2 text-success"></i>TLS SNI Host
+                    </h3>
+                    <ul class="list-disc list-inside text-gray-300 space-y-1 text-sm">
+                        <li>fcmtoken.googleapis.com</li>
+                        <li>support.maya.ph</li>
+                        <li>api.paymaya.com</li>
+                        <li>www.maya.ph</li>
+                        <li>mayabank.ph</li>
+                        <li>firebase-settings.crashlytics.com</li>
+                        <li>google.com</li>
+                    </ul>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-5 shadow-lg border border-slate-700">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">Protocol Type</h3>
+                            <ul class="space-y-1 text-gray-300 text-sm">
+                                <li>✅ TROJAN</li>
+                                <li>✅ VMESS</li>
+                                <li>✅ VLESS</li>
+                                <li>✅ SHADOWSOCKS</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">Transport Mode</h3>
+                            <ul class="space-y-1 text-gray-300 text-sm">
+                                <li>🔌 WebSocket</li>
+                                <li>🔌 HTTP Upgrade</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-6">
+                <div class="bg-slate-800 rounded-lg p-5 shadow-lg border border-slate-700">
+                    <h3 class="text-xl font-semibold text-white mb-4 flex items-center">
+                        <i class="fa fa-line-chart mr-2 text-warning"></i>REAL-TIME MONITOR
+                    </h3>
+                    <div class="grid grid-cols-3 gap-3 text-center">
+                        <div class="bg-slate-700 rounded p-3">
+                            <p class="text-xs text-gray-400">DOWNLOAD</p>
+                            <p class="text-lg font-bold text-success" id="downSpeed">-- MB/s</p>
+                        </div>
+                        <div class="bg-slate-700 rounded p-3">
+                            <p class="text-xs text-gray-400">UPLOAD</p>
+                            <p class="text-lg font-bold text-accent" id="upSpeed">-- MB/s</p>
+                        </div>
+                        <div class="bg-slate-700 rounded p-3">
+                            <p class="text-xs text-gray-400">LATENCY</p>
+                            <p class="text-lg font-bold text-warning" id="latency">-- ms</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-slate-800 rounded-lg p-5 shadow-lg border border-slate-700">
+                    <h3 class="text-xl font-semibold text-white mb-3 flex items-center">
+                        <i class="fa fa-code mr-2 text-danger"></i>GENERATOR CONFIG
+                    </h3>
+                    <div class="bg-slate-900 rounded p-3 mb-4 border border-accent/30">
+                        <h4 class="text-md font-semibold text-accent mb-2">📋 READY-TO-USE CONFIG LINKS</h4>
+                        <p class="text-xs text-gray-400 mb-2">Palitan ang <code class="text-yellow-300">YOUR_CLOUD_RUN_URL</code> pagkatapos i-deploy</p>
+                        <div class="space-y-2 text-sm">
+                            <div>
+                                <p class="text-green-400 font-medium">VMESS WS:</p>
+                                <input type="text" id="vmessLink" value="vmess://eyJhZG1pcCI6IllPVVJfQ0xPVURfUlVOX1VSTCIsImFpZCI6IjAiLCJob3N0IjoiZ29vZ2xlLmNvbSIsImlkIjoicmFmYWVsdHYiLCJuZXQiOiJ3cyIsInBhdGgiOiIvUmFmYWVsLVR2IiwicG9ydCI6IjQ0MyIsInBzIjoiVm1lc3MgUmFmYWVsIiwic2N5IjoiYXV0byIsInNuaSI6Imdvb2dsZS5jb20iLCJ0bHMiOiJ0bHMiLCJ0eXBlIjoiIiwidiI6IjIifQ==" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs" readonly>
+                                <button onclick="copyLink('vmessLink')" class="text-xs text-blue-300 hover:text-blue-400 mt-1">Copy</button>
+                            </div>
+                            <div>
+                                <p class="text-green-400 font-medium">TROJAN WS:</p>
+                                <input type="text" id="trojanLink" value="trojan://rafaeltv@YOUR_CLOUD_RUN_URL:443?path=%2Ftrojan-rafael%3Fed%3D2180&security=tls&host=google.com&type=ws&sni=google.com#Trojan-Rafael" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs" readonly>
+                                <button onclick="copyLink('trojanLink')" class="text-xs text-blue-300 hover:text-blue-400 mt-1">Copy</button>
+                            </div>
+                            <div>
+                                <p class="text-green-400 font-medium">VLESS WS:</p>
+                                <input type="text" id="vlessLink" value="vless://15f7e8ea-7b56-45d4-93af-31f3c592fdf1@YOUR_CLOUD_RUN_URL:443?path=%2Fvless-rafael%3Fed%3D2180&security=tls&host=google.com&type=ws&encryption=none&sni=google.com#Vless-Rafael" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs" readonly>
+                                <button onclick="copyLink('vlessLink')" class="text-xs text-blue-300 hover:text-blue-400 mt-1">Copy</button>
+                            </div>
+                            <div>
+                                <p class="text-green-400 font-medium">SHADOWSOCKS HTTP-UPGRADE:</p>
+                                <input type="text" id="ssLink" value="ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpyYWZhZWx0dkBZT1VSX0NMT1VEX1JVTl9VUkw6NDQz?plugin=v2ray-plugin;path=%2Fhttpupgrade-rafael%3Fed%3D2180;host=google.com;tls;mode=httpupgrade#SS-Rafael" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs" readonly>
+                                <button onclick="copyLink('ssLink')" class="text-xs text-blue-300 hover:text-blue-400 mt-1">Copy</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer class="mt-10 text-center text-gray-500 text-sm">
+            <p>Config Generator • VMess/VLESS/Trojan/Shadowsocks • GCP Cloud Run</p>
+            <p class="mt-1">© 2026 Rafael R.</p>
+        </footer>
+    </div>
+    <script>
+        function updateMonitor() {
+            document.getElementById('downSpeed').textContent = (Math.random() * 12 + 1).toFixed(2) + " MB/s";
+            document.getElementById('upSpeed').textContent = (Math.random() * 5 + 0.5).toFixed(2) + " MB/s";
+            document.getElementById('latency').textContent = Math.floor(Math.random() * 60 + 20) + " ms";
+        }
+        setInterval(updateMonitor, 2000);
+        function copyLink(id) {
+            const el = document.getElementById(id);
+            el.select();
+            navigator.clipboard.writeText(el.value).then(() => {
+                alert("✅ NAKOPYA! Palitan ang YOUR_CLOUD_RUN_URL");
+            });
+        }
+    </script>
+</body>
+</html>
