@@ -3,7 +3,7 @@ name: Build & Push to Docker Hub
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Pwede mong patakbuhin nang mano-mano
+  workflow_dispatch: # Pwede patakbuhin nang mano-mano
 
 jobs:
   build:
@@ -16,12 +16,12 @@ jobs:
       - name: 🔑 Mag-login sa Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME_virgozki }}
-          password: ${{ secrets.DOCKER_PASSWORD_dckr_pat_bI23fAx1dX9XcJ9nOxphpl6HW_k }}
+          username: ${{ secrets.DOCKER_virgozki }}
+          password: ${{ secrets.DOCKER_dckr_pat_bI23fAx1dX9XcJ9nOxphpl6HW_k }}
 
       - name: 🛠️ I-build at i-push ang image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: virgozki/rafael:latest # Palitan mo kung gusto mo ibang pangalan
+          tags: virgozki/rafael:latest
