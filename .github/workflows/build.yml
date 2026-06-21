@@ -1,189 +1,251 @@
-name: Build & Deploy to Cloud Run
+name: Build & Deploy Proxy
 
-# Tatakbo kapag may push sa main branch
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Pwede ring patakbuhin nang mano-mano
+  workflow_dispatch:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: us-central1
-  SERVICE_NAME: rafael-tv-proxy
-  DOMAIN: www.google.com
-  VMESS_PATH: /Rafael-Tv
-  VMESS_ID: rafaeltv
+  SERVICE_NAME: rafael-proxy
+  VMESS_UUID: rafaeltv
   VLESS_UUID: 15f7e8ea-7b56-45d4-93af-31f3c592fdf1
   PASSWORD: rafaeltv
+  PORT: 8080
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 I-checkout ang code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🔑 I-setup ang Google Cloud
+      - name: Authenticate sa GCP
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: ⚙️ I-setup ang gcloud CLI
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
-          install_components: beta
 
-      - name: 🚀 I-enable ang mga kailangang API
+      - name: Enable APIs
         run: |
-          gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+          gcloud services enable \
+            run.googleapis.com \
+            cloudbuild.googleapis.com \
+            artifactregistry.googleapis.com \
+            --quiet
 
-      - name: 📝 Gumawa ng config files (kung wala sa repo)
+      # Gumawa ng lahat ng files nang tama
+      - name: Create config files
         run: |
-          # config.json
+          # Xray config
           cat > config.json <<EOF
           {
             "log": { "loglevel": "warning" },
             "inbounds": [
               {
-                "tag": "vmess-ws", "port": 10000, "listen": "127.0.0.1", "protocol": "vmess",
-                "settings": { "clients": [{"id":"${VMESS_ID}","alterId":0,"security":"auto"}] },
-                "sniffing": {"enabled":true},
-                "streamSettings": {"network":"ws","wsSettings":{"path":"${VMESS_PATH}"}}
+                "tag": "vmess",
+                "port": 10000,
+                "listen": "127.0.0.1",
+                "protocol": "vmess",
+                "settings": { "clients": [{"id":"${VMESS_UUID}","alterId":0,"security":"auto"}] },
+                "streamSettings": { "network": "ws", "wsSettings": { "path": "/Rafael-Tv" } }
               },
               {
-                "tag": "trojan-ws", "port": 10001, "listen": "127.0.0.1", "protocol": "trojan",
-                "settings": {"clients":[{"password":"${PASSWORD}"}]},
-                "sniffing": {"enabled":true},
-                "streamSettings": {"network":"ws","wsSettings":{"path":"/trojan-rafael?ed=2180"}}
+                "tag": "vless",
+                "port": 10001,
+                "listen": "127.0.0.1",
+                "protocol": "vless",
+                "settings": { "clients": [{"id":"${VLESS_UUID}"}],"decryption":"none" },
+                "streamSettings": { "network": "ws", "wsSettings": { "path": "/vless-rafael" } }
               },
               {
-                "tag": "vless-ws", "port": 10002, "listen": "127.0.0.1", "protocol": "vless",
-                "settings": {"clients":[{"id":"${VLESS_UUID}"}],"decryption":"none"},
-                "sniffing": {"enabled":true},
-                "streamSettings": {"network":"ws","wsSettings":{"path":"/vless-rafael?ed=2180"}}
+                "tag": "trojan",
+                "port": 10002,
+                "listen": "127.0.0.1",
+                "protocol": "trojan",
+                "settings": { "clients": [{"password":"${PASSWORD}"}] },
+                "streamSettings": { "network": "ws", "wsSettings": { "path": "/trojan-rafael" } }
               },
               {
-                "tag": "ss-hu", "port": 11004, "listen": "127.0.0.1", "protocol": "shadowsocks",
-                "settings": {"method":"chacha20-ietf-poly1305","password":"${PASSWORD}"},
-                "sniffing": {"enabled":true},
-                "streamSettings": {"network":"httpupgrade","httpupgradeSettings":{"path":"/httpupgrade-rafael?ed=2180"}}
+                "tag": "ss",
+                "port": 10003,
+                "listen": "127.0.0.1",
+                "protocol": "shadowsocks",
+                "settings": { "method": "chacha20-ietf-poly1305", "password": "${PASSWORD}" },
+                "streamSettings": { "network": "httpupgrade", "httpupgradeSettings": { "path": "/ss-rafael" } }
               }
             ],
-            "outbounds": [{"protocol":"freedom","tag":"direct"}]
+            "outbounds": [ { "protocol": "freedom", "tag": "direct" } ]
           }
           EOF
 
-          # nginx.conf
+          # Nginx config - TAMA NA ANG ROOT AT PROXY
           cat > nginx.conf <<EOF
-          worker_processes auto; worker_rlimit_nofile 200000;
+          worker_processes auto;
+          worker_rlimit_nofile 65535;
           events { worker_connections 65535; multi_accept on; }
           http {
             sendfile on; tcp_nopush on; tcp_nodelay on;
             keepalive_timeout 65; client_max_body_size 0;
-            proxy_buffering off; proxy_request_buffering off; server_tokens off;
+            proxy_buffering off; proxy_request_buffering off;
+            server_tokens off;
+
             map \$http_upgrade \$connection_upgrade { default upgrade; '' close; }
+
             server {
-              listen 8080; http2 on;
-              location = / { root /usr/share/nginx/html; index index.html; try_files \$uri /index.html; }
-              location ${VMESS_PATH} { proxy_pass http://127.0.0.1:10000; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \$connection_upgrade; proxy_set_header Host \$host; proxy_read_timeout 86400; }
-              location /trojan-rafael { proxy_pass http://127.0.0.1:10001; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \$connection_upgrade; proxy_set_header Host \$host; proxy_read_timeout 86400; }
-              location /vless-rafael { proxy_pass http://127.0.0.1:10002; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \$connection_upgrade; proxy_set_header Host \$host; proxy_read_timeout 86400; }
-              location /httpupgrade-rafael { proxy_pass http://127.0.0.1:11004; proxy_http_version 1.1; proxy_set_header Upgrade \$http_upgrade; proxy_set_header Connection \$connection_upgrade; proxy_set_header Host \$host; proxy_read_timeout 86400; }
+              listen ${PORT};
+              server_name _;
+
+              # 📌 Pahina - Siguradong makikita ang index.html
+              root /usr/share/nginx/html;
+              index index.html;
+              location = / { try_files \$uri /index.html; }
+
+              # 📌 Mga Proxy Path
+              location /Rafael-Tv {
+                proxy_pass http://127.0.0.1:10000;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection \$connection_upgrade;
+                proxy_set_header Host \$host;
+                proxy_read_timeout 86400;
+              }
+
+              location /vless-rafael {
+                proxy_pass http://127.0.0.1:10001;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection \$connection_upgrade;
+                proxy_set_header Host \$host;
+                proxy_read_timeout 86400;
+              }
+
+              location /trojan-rafael {
+                proxy_pass http://127.0.0.1:10002;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection \$connection_upgrade;
+                proxy_set_header Host \$host;
+                proxy_read_timeout 86400;
+              }
+
+              location /ss-rafael {
+                proxy_pass http://127.0.0.1:10003;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection \$connection_upgrade;
+                proxy_set_header Host \$host;
+                proxy_read_timeout 86400;
+              }
             }
           }
           EOF
 
-          # index.html (iyong pahina)
+          # 📌 Index.html - May dynamic URL na papalitan
           cat > index.html <<'HTML'
           <!DOCTYPE html>
           <html lang="en">
           <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Rafael R. Config Generator</title>
+            <title>Rafael Config Generator</title>
             <script src="https://cdn.tailwindcss.com"></script>
-            <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-            <script>tailwind.config={theme:{extend:{colors:{dark:'#0F172A',darker:'#020617',accent:'#3B82F6',success:'#10B981',warning:'#F59E0B',danger:'#EF4444'},fontFamily:{inter:['Inter','sans-serif']}}}};</script>
-            <style>.scrollbar-thin::-webkit-scrollbar{width:6px;height:6px;}.scrollbar-thin::-webkit-scrollbar-track{background:#1E293B;}.scrollbar-thin::-webkit-scrollbar-thumb{background:#475569;border-radius:3px;}</style>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+            <script>
+              tailwind.config = { theme: { extend: { colors: { dark:'#0F172A', darker:'#020617', accent:'#3B82F6', success:'#10B981', warning:'#F59E0B', danger:'#EF4444' } } } }
+            </script>
+            <style>.scrollbar-thin::-webkit-scrollbar{width:6px;}.scrollbar-thin::-webkit-scrollbar-thumb{background:#475569;border-radius:3px;}</style>
           </head>
-          <body class="bg-gradient-to-br from-darker to-dark text-gray-100 font-inter min-h-screen">
-            <div class="container mx-auto px-4 py-8 max-w-4xl">
-              <header class="mb-8 text-center"><h1 class="text-3xl md:text-4xl font-bold text-accent mb-2"><i class="fa fa-cogs mr-2"></i>Config Generator</h1><p class="text-gray-400">VMess • VLESS • Trojan • Shadowsocks | GCP Cloud Run</p></header>
-              <div class="grid md:grid-cols-2 gap-6">
-                <div class="space-y-6">
-                  <div class="bg-slate-800 rounded-lg p-5 shadow-lg border border-slate-700"><h3 class="text-xl font-semibold text-white mb-3"><i class="fa fa-server mr-2 text-accent"></i>Server</h3><ul class="list-disc list-inside text-gray-300 space-y-1 text-sm"><li>www.google.com</li><li>www.cloudflare.com</li></ul></div>
-                  <div class="bg-slate-800 rounded-lg p-5 shadow-lg border border-slate-700"><h3 class="text-xl font-semibold text-white mb-3"><i class="fa fa-lock mr-2 text-success"></i>TLS/SNI</h3><ul class="list-disc list-inside text-gray-300 space-y-1 text-sm"><li>google.com</li><li>cloudflare.com</li></ul></div>
-                </div>
-                <div class="space-y-6">
-                  <div class="bg-slate-800 rounded-lg p-5 shadow-lg border border-slate-700">
-                    <h3 class="text-xl font-semibold text-white mb-3"><i class="fa fa-code mr-2 text-danger"></i>Configs</h3>
-                    <div class="space-y-2 text-sm">
-                      <div><p class="text-green-400">VMess:</p><input id="vmess" value="vmess://eyJhZG1pcCI6IlVSTCIsImFpZCI6IjAiLCJob3N0IjoiZ29vZ2xlLmNvbSIsImlkIjoicmFmYWVsdHYiLCJuZXQiOiJ3cyIsInBhdGgiOiIvUmFmYWVsLVR2IiwicG9ydCI6IjQ0MyIsInRscyI6InRscyIsInBzIjoiVm1lc3MifQ==" class="w-full bg-slate-900 p-1 rounded text-xs" readonly></div>
-                      <div><p class="text-green-400">VLESS:</p><input id="vless" value="vless://15f7e8ea-7b56-45d4-93af-31f3c592fdf1@URL:443?path=%2Fvless-rafael&security=tls&sni=google.com&type=ws#Vless" class="w-full bg-slate-900 p-1 rounded text-xs" readonly></div>
-                    </div>
-                  </div>
-                </div>
+          <body class="bg-gradient-to-br from-darker to-dark text-gray-100 min-h-screen p-4">
+            <div class="max-w-3xl mx-auto">
+              <h1 class="text-2xl font-bold text-accent mb-4 text-center"><i class="fa fa-cogs mr-2"></i>Proxy Config Generator</h1>
+
+              <div class="bg-slate-800 p-4 rounded mb-4">
+                <h3 class="text-lg font-semibold mb-2 text-green-400">✅ VMESS WS</h3>
+                <input type="text" id="vmess" class="w-full bg-slate-900 p-2 rounded text-sm" readonly>
+              </div>
+
+              <div class="bg-slate-800 p-4 rounded mb-4">
+                <h3 class="text-lg font-semibold mb-2 text-green-400">✅ VLESS WS</h3>
+                <input type="text" id="vless" class="w-full bg-slate-900 p-2 rounded text-sm" readonly>
+              </div>
+
+              <div class="bg-slate-800 p-4 rounded mb-4">
+                <h3 class="text-lg font-semibold mb-2 text-green-400">✅ TROJAN WS</h3>
+                <input type="text" id="trojan" class="w-full bg-slate-900 p-2 rounded text-sm" readonly>
               </div>
             </div>
+
+            <script>
+              const base = window.location.origin;
+              document.getElementById('vmess').value = btoa(JSON.stringify({
+                v: "2", ps: "VMess-Rafael", add: new URL(base).hostname, port: "443",
+                id: "rafaeltv", aid: "0", scy: "auto", net: "ws", type: "", host: "google.com",
+                path: "/Rafael-Tv", tls: "tls", sni: "google.com"
+              }));
+              document.getElementById('vless').value = `vless://15f7e8ea-7b56-45d4-93af-31f3c592fdf1@${new URL(base).hostname}:443?path=%2Fvless-rafael&security=tls&host=google.com&type=ws&encryption=none&sni=google.com#Vless-Rafael`;
+              document.getElementById('trojan').value = `trojan://rafaeltv@${new URL(base).hostname}:443?path=%2Ftrojan-rafael&security=tls&host=google.com&type=ws&sni=google.com#Trojan-Rafael`;
+            </script>
           </body>
           </html>
           HTML
 
-          # entrypoint.sh
+          # Entrypoint
           cat > entrypoint.sh <<EOF
           #!/bin/sh
+          set -e
           /usr/local/bin/xray run -c /etc/xray.json &
           sleep 3
           exec /usr/local/openresty/bin/openresty -g 'daemon off;'
           EOF
           chmod +x entrypoint.sh
 
-      - name: 🐳 Dockerfile
+      # Dockerfile - Siguradong kasama ang index.html
+      - name: Create Dockerfile
         run: |
           cat > Dockerfile <<EOF
-          FROM alpine:3.19 AS xray-bin
-          RUN apk add --no-cache curl unzip ca-certificates bash
-          WORKDIR /app
-          RUN curl -L https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -o xray.zip \
-            && unzip xray.zip && chmod +x xray && mv xray /usr/local/bin/xray && rm -f xray.zip
+          FROM alpine:3.19 AS xray
+          RUN apk add --no-cache curl unzip
+          RUN curl -sL https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -o x.zip && unzip x.zip && mv xray /usr/local/bin/ && rm -rf x.zip
 
-          FROM openresty/openresty:alpine-fat
-          RUN apk add --no-cache ca-certificates bash curl tzdata
-          COPY --from=xray-bin /usr/local/bin/xray /usr/local/bin/xray
+          FROM openresty/openresty:alpine
+          RUN apk add --no-cache ca-certificates
+          COPY --from=xray /usr/local/bin/xray /usr/local/bin/xray
           COPY config.json /etc/xray.json
           COPY nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
           COPY index.html /usr/share/nginx/html/index.html
           COPY entrypoint.sh /entrypoint.sh
           RUN chmod +x /usr/local/bin/xray /entrypoint.sh
-          EXPOSE 8080
+          EXPOSE ${PORT}
           ENTRYPOINT ["/entrypoint.sh"]
           EOF
 
-      - name: 🏗️ Build Docker Image
-        run: |
-          gcloud builds submit --tag gcr.io/${PROJECT_ID}/${SERVICE_NAME} .
+      - name: Build Image
+        run: gcloud builds submit --tag gcr.io/${PROJECT_ID}/${SERVICE_NAME} . --quiet
 
-      - name: 🚀 Deploy to Cloud Run
+      - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${SERVICE_NAME} \
             --image gcr.io/${PROJECT_ID}/${SERVICE_NAME} \
-            --platform managed \
             --region ${REGION} \
+            --platform managed \
             --allow-unauthenticated \
-            --port 8080 \
-            --memory 4Gi \
-            --cpu 4 \
-            --concurrency 1000 \
-            --timeout 3600 \
+            --port ${PORT} \
+            --memory 2Gi \
+            --cpu 1 \
             --min-instances 0 \
-            --max-instances 2 \
+            --max-instances 1 \
             --execution-environment gen2 \
-            --cpu-boost \
+            --cpu-throttling \
             --quiet
 
-      - name: 🔗 Ipakita ang URL
+      - name: Result
         run: |
-          URL=$(gcloud run services describe ${SERVICE_NAME} --region=${REGION} --format='value(status.url)')
-          echo "✅ Deployed: $URL"
-          echo "CONFIG_URL=$URL" >> $GITHUB_OUTPUT
+          URL=$(gcloud run services describe ${SERVICE_NAME} --region ${REGION} --format='value(status.url)')
+          echo "✅ Tapos na! Pahina: $URL"
+
