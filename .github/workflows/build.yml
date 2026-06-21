@@ -1,25 +1,27 @@
-name: Build & Push Docker Image
+name: Build & Push to Docker Hub
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch: # Pwede mong patakbuhin nang mano-mano
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: 📥 Kumuha ng mga file
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build -t docker.io/virgozki/vless:latest .
+      - name: 🔑 Mag-login sa Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME_virgozki }}
+          password: ${{ secrets.DOCKER_PASSWORD_dckr_pat_bI23fAx1dX9XcJ9nOxphpl6HW_k }}
 
-      # Pwede mong i-uncomment kapag handa ka nang i-push sa Docker Hub
-      # - name: Push to Docker Hub
-      #   if: github.ref == 'refs/heads/main'
-      #   run: |
-      #     echo "${{ secrets.DOCKER_PASSWORD_RAFAEL092293 }}" | docker login -u "${{ secrets.DOCKER_USERNAME_VIRGOZKI }}" --password-stdin
-      #     docker tag docker.io/virgozki/vless:latest docker.io/virgozki/vless:latest
-      #     docker push docker.io/virgozki/vless:latest
+      - name: 🛠️ I-build at i-push ang image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: virgozki/rafael:latest # Palitan mo kung gusto mo ibang pangalan
