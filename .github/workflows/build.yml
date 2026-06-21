@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_marine-service-499713-u2 }}
   REGION: us-central1
   SERVICE_NAME: rafael-proxy
   VMESS_UUID: rafaeltv
@@ -28,7 +28,7 @@ jobs:
       - name: 🔑 Authenticate with GCP
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          credentials_json: ${{ secrets.GCP_SA_1046132445504 }}
 
       - name: ⚙️ Setup Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
